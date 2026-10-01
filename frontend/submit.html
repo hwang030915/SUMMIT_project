@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>제출 체크 | 결산체크</title>
+  <script src="js/theme.js"></script>
+  <link rel="stylesheet" href="css/common.css" />
+  <link rel="stylesheet" href="css/app.css" />
+  <link rel="stylesheet" href="css/pages.css" />
+</head>
+<body class="app">
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="app-main">
+      <header class="page-header" id="pageHeader"></header>
+
+      <div class="submit-grid">
+        <div class="submit-left">
+          <section class="stats" id="stats" aria-label="제출 요약"></section>
+
+          <section class="card" aria-labelledby="listTitle">
+            <div class="card-header list-toolbar">
+              <h2 class="card-title" id="listTitle">제출 요청 목록</h2>
+              <span class="spacer"></span>
+              <div class="input-wrap search-box">
+                <span class="input-icon" data-icon="search"></span>
+                <input class="input" type="search" id="searchInput" placeholder="자료명, 담당 부서로 검색하세요." aria-label="검색" />
+              </div>
+              <select class="input select toolbar-select" id="monthFilter" aria-label="결산월"></select>
+              <select class="input select toolbar-select" id="statusFilter" aria-label="제출 상태">
+                <option value="all">전체 상태</option>
+                <option value="pending">미제출</option>
+                <option value="done">제출 완료</option>
+                <option value="late">지연</option>
+              </select>
+            </div>
+            <div class="table-wrap">
+              <table class="table table-submit">
+                <thead>
+                  <tr>
+                    <th class="col-check"><span class="sr-only">선택</span></th>
+                    <th>No.</th>
+                    <th>자료명</th>
+                    <th>담당 부서</th>
+                    <th>제출 기한</th>
+                    <th>D-day</th>
+                    <th>제출 상태</th>
+                    <th><span class="sr-only">상세</span></th>
+                  </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+              </table>
+            </div>
+            <div class="list-footer">
+              <span class="list-total" id="totalCount">총 0건</span>
+              <nav class="pagination" id="pagination" aria-label="페이지"></nav>
+              <span></span>
+            </div>
+          </section>
+        </div>
+
+        <aside class="submit-panel" id="submitPanel" aria-labelledby="panelTitle"></aside>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/utils.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/submit.js"></script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>결산 요청 등록 | 결산체크</title>
+  <script src="js/theme.js"></script>
+  <link rel="stylesheet" href="css/common.css" />
+  <link rel="stylesheet" href="css/app.css" />
+  <link rel="stylesheet" href="css/pages.css" />
+</head>
+<body class="app">
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="app-main">
+      <header class="page-header" id="pageHeader"></header>
+      <div class="page-alerts" id="pageAlerts"></div>
+
+      <div class="request-grid">
+        <section class="card request-card" aria-labelledby="formTitle">
+          <div class="form-card-head">
+            <span class="head-icon head-icon-lg" data-icon="fileFill"></span>
+            <div>
+              <h2 class="card-title" id="formTitle">결산 요청 정보 입력</h2>
+              <p class="card-sub">요청할 결산 자료의 상세 정보를 입력해주세요.</p>
+            </div>
+          </div>
+          <div id="requestForm"></div>
+        </section>
+
+        <div class="request-side">
+          <section class="promo" id="promo">
+            <div>
+              <p class="promo-title">모든 사용자가<br />공유 현황판을 확인할 수 있어요!</p>
+              <p class="promo-desc">등록한 결산 요청은 전 부서가 공유하는<br />결산 현황에서 바로 확인할 수 있습니다.</p>
+            </div>
+          </section>
+
+          <section class="card recent-card" aria-labelledby="recentTitle">
+            <div class="card-header">
+              <span class="recent-head-icon" data-icon="clock"></span>
+              <h2 class="card-title" id="recentTitle">최근 등록한 요청</h2>
+              <span class="spacer"></span>
+              <a class="link-more" href="main.html">전체 보기<span data-icon="chevronRight"></span></a>
+            </div>
+            <ul class="recent-list" id="recentList"></ul>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/utils.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/request-form.js"></script>
+  <script src="js/request.js"></script>
+</body>
+</html>

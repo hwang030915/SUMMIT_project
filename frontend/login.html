@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>로그인 | 결산체크</title>
+  <meta name="description" content="월말 결산 자료의 요청·제출 상태를 한곳에서 관리하는 결산체크" />
+  <script src="js/theme.js"></script>
+  <link rel="stylesheet" href="css/common.css" />
+  <link rel="stylesheet" href="css/login.css" />
+</head>
+<body>
+  <main class="login-page">
+    <div class="login-card">
+      <section class="login-brand" id="authBrand" aria-label="결산체크 소개"></section>
+
+      <section class="login-form-area" aria-labelledby="loginTitle">
+        <p class="login-greeting">안녕하세요,</p>
+        <h1 class="login-title" id="loginTitle">결산체크에 로그인하세요.</h1>
+        <p class="login-subtitle">계정으로 로그인하여 결산 업무를 시작하세요.</p>
+
+        <form class="login-form" id="loginForm" novalidate>
+          <div class="form-alert" id="formAlert" role="alert"></div>
+
+          <div class="field">
+            <label class="field-label" for="email">이메일<span class="required">*</span></label>
+            <div class="input-wrap">
+              <span class="input-icon" data-icon="mail"></span>
+              <input class="input" type="email" id="email" name="email" placeholder="이메일을 입력하세요." autocomplete="username" />
+            </div>
+            <p class="field-error"></p>
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="password">비밀번호<span class="required">*</span></label>
+            <div class="input-wrap">
+              <span class="input-icon" data-icon="lock"></span>
+              <input class="input has-trailing" type="password" id="password" name="password" placeholder="비밀번호를 입력하세요." autocomplete="current-password" />
+              <button type="button" class="icon-btn" id="togglePassword"></button>
+            </div>
+            <p class="field-error"></p>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block" id="loginBtn">로그인</button>
+        </form>
+
+        <div class="login-divider">또는</div>
+
+        <nav class="login-links" aria-label="계정 도움말">
+          <a href="find-password.html">비밀번호 찾기</a>
+          <span class="sep" aria-hidden="true"></span>
+          <a href="signup.html">회원가입</a>
+        </nav>
+      </section>
+    </div>
+  </main>
+
+  <script src="js/utils.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/auth-brand.js"></script>
+  <script src="js/login.js"></script>
+</body>
+</html>

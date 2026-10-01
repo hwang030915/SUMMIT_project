@@ -1,0 +1,11 @@
+# Office 임시 잠금 파일
+~$*
+
+# 캠프 실습 자료 (프로젝트와 무관)
+실습자료/
+
+# OS / 에디터
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
