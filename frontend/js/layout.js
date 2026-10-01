@@ -20,7 +20,7 @@ const Layout = (() => {
 
     document.getElementById("sidebar").innerHTML = `
       <a class="sidebar-logo" href="main.html">
-        <span class="logo-mark">${Icons.get("check")}</span><span class="logo-text">결산체크</span>
+        <span class="logo-mark">${Icons.get("check")}</span><span class="logo-name"><span class="logo-text">SUMMIT</span><span class="logo-slogan"><span class="nowrap">놓치기 쉬운 결산,</span> <span class="nowrap">빠짐없이 <strong>SUMMIT</strong></span></span></span>
       </a>
       <nav class="sidebar-nav" aria-label="주 메뉴">
         ${NAV.map(

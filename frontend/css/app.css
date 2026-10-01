@@ -52,11 +52,30 @@ body.app {
   height: 24px;
 }
 
+.logo-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .logo-text {
   font-size: 24px;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
   color: var(--text-strong);
+}
+
+.logo-slogan {
+  margin-top: 4px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.logo-slogan strong {
+  color: var(--primary);
+  font-weight: 800;
 }
 
 .sidebar-nav {
@@ -1327,6 +1346,11 @@ button.stat-card {
 
   .logo-text {
     font-size: 20px;
+  }
+
+  .logo-slogan {
+    margin-top: 2px;
+    font-size: 11px;
   }
 
   .logo-mark {

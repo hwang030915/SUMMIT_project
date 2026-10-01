@@ -8,7 +8,10 @@
   el.innerHTML = `
     <div class="brand-logo">
       <span class="brand-logo-mark" aria-hidden="true">${Icons.get("check")}</span>
-      <p class="brand-logo-text">결산체크</p>
+      <div class="brand-logo-name">
+        <p class="brand-logo-text">SUMMIT</p>
+        <p class="brand-slogan"><span class="nowrap">놓치기 쉬운 결산,</span> <span class="nowrap">빠짐없이 <strong>SUMMIT</strong></span></p>
+      </div>
     </div>
     <p class="brand-tagline">월말 결산 자료의 요청·제출 상태를<br />한곳에서 관리하세요.</p>
 
