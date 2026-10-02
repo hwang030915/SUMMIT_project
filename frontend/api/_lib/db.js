@@ -21,22 +21,83 @@ function dbNameFrom(uri) {
   return "summit";
 }
 
-export async function getDb() {
-  const uri = process.env.MONGODB_URI;
-  if (!uri) throw new HttpError(500, "MONGODB_URI 환경 변수가 설정되지 않았습니다.");
+/** 환경 변수 값 정리: 붙여 넣을 때 섞여 들어간 앞뒤 공백·따옴표 제거 */
+export function readUri() {
+  return (process.env.MONGODB_URI || "").trim().replace(/^["']+|["']+$/g, "").trim();
+}
+
+/**
+ * 연결 실패 원인을 분류해 해결 방법을 알려줌 (주소·비밀번호 같은 비밀값은 포함하지 않음)
+ * @returns {{ code: string, hint: string }}
+ */
+export function diagnose(err, uri = readUri()) {
+  const text = `${err && err.name} ${err && err.message} ${err && err.cause ? err.cause.message : ""} ${
+    err && err.reason ? JSON.stringify([...(err.reason.servers?.values?.() || [])].map((s) => s.error?.message)) : ""
+  }`;
+
+  if (!uri) {
+    return { code: "NO_ENV", hint: "MONGODB_URI 환경 변수가 없습니다. Vercel → Settings → Environment Variables에서 Production 환경에 추가한 뒤 재배포하세요." };
+  }
+  if (!/^mongodb(\+srv)?:\/\//.test(uri)) {
+    return { code: "BAD_SCHEME", hint: "MONGODB_URI는 mongodb+srv:// 또는 mongodb:// 로 시작해야 합니다. Atlas의 Connect → Drivers에서 주소를 다시 복사하세요." };
+  }
+  if (/<[^>]*>/.test(uri)) {
+    return { code: "PLACEHOLDER", hint: "주소에 <db_password> 같은 자리표시자가 그대로 남아 있습니다. 꺾쇠(<>)까지 지우고 실제 DB 사용자 비밀번호로 바꾸세요." };
+  }
+  const authority = uri.replace(/^mongodb(\+srv)?:\/\//, "").split("/")[0];
+  if ((authority.match(/@/g) || []).length > 1) {
+    return { code: "PARSE", hint: "비밀번호에 @ 문자가 그대로 들어 있습니다. 비밀번호 안의 @는 %40으로 바꾸세요 (: → %3A, / → %2F, # → %23)." };
+  }
+  if (/MongoParseError|URI|Invalid scheme|malformed|Password contains unescaped/i.test(text) && !/Server selection/i.test(text)) {
+    return { code: "PARSE", hint: "주소 형식이 올바르지 않습니다. 비밀번호에 @ : / ? # % 같은 특수문자가 있으면 URL 인코딩(예: @ → %40)해야 합니다." };
+  }
+  if (/bad auth|Authentication failed|AuthenticationFailed|auth error|code: 18|SCRAM/i.test(text)) {
+    return { code: "AUTH", hint: "아이디 또는 비밀번호가 틀렸습니다. Atlas → Database Access의 'DB 사용자' 이름·비밀번호인지 확인하세요 (Atlas 로그인 계정 비밀번호가 아닙니다)." };
+  }
+  if (/ENOTFOUND|querySrv|EAI_AGAIN|ENODATA|getaddrinfo/i.test(text)) {
+    return { code: "DNS", hint: "클러스터 주소를 찾을 수 없습니다. 주소의 호스트 이름(cluster0.xxxxx.mongodb.net)에 오타가 없는지, 클러스터가 삭제되지 않았는지 확인하세요." };
+  }
+  if (/not authorized|Unauthorized|requires authentication/i.test(text)) {
+    return { code: "PERMISSION", hint: "DB 사용자에게 쓰기 권한이 없습니다. Atlas → Database Access에서 해당 사용자를 'Read and write to any database'로 바꾸세요." };
+  }
+  if (/timed out|ETIMEDOUT|Server selection|ECONNREFUSED|ECONNRESET|ssl|tls|alert|socket/i.test(text)) {
+    return { code: "NETWORK", hint: "접속 시간 초과입니다. 가장 흔한 원인은 IP 차단입니다. Atlas → Network Access에 0.0.0.0/0(Allow access from anywhere)을 추가하세요. 클러스터가 일시 중지(Paused)되었는지도 확인하세요." };
+  }
+  return { code: "UNKNOWN", hint: "알 수 없는 연결 오류입니다. Vercel 배포의 Logs에서 자세한 내용을 확인하세요." };
+}
+
+function dbError(err) {
+  console.error("[MongoDB]", err);
+  const diag = diagnose(err);
+  const httpErr = new HttpError(503, `데이터베이스에 연결할 수 없습니다. (${diag.code}) ${diag.hint}`);
+  httpErr.diag = diag;
+  httpErr.detail = String((err && err.message) || "").slice(0, 300);
+  return httpErr;
+}
+
+export async function connect() {
+  const uri = readUri();
+  // 주소 자체가 잘못된 경우는 접속을 시도하지 않고 바로 알려줌
+  const early = diagnose(new Error(""), uri);
+  if (["NO_ENV", "BAD_SCHEME", "PLACEHOLDER", "PARSE"].includes(early.code)) throw dbError(new Error("invalid MONGODB_URI"));
 
   if (!cache.client) {
-    cache.client = new MongoClient(uri, { maxPoolSize: 5, serverSelectionTimeoutMS: 8000 }).connect();
+    try {
+      cache.client = new MongoClient(uri, { maxPoolSize: 5, serverSelectionTimeoutMS: 8000 }).connect();
+    } catch (err) {
+      throw dbError(err); // 주소 형식 오류는 생성 시점에 바로 발생
+    }
   }
-  let client;
   try {
-    client = await cache.client;
+    return { client: await cache.client, uri };
   } catch (err) {
     cache.client = null; // 다음 요청에서 다시 연결 시도
-    console.error(err);
-    throw new HttpError(503, "데이터베이스에 연결할 수 없습니다. 잠시 후 다시 시도하세요.");
+    throw dbError(err);
   }
+}
 
+export async function getDb() {
+  const { client, uri } = await connect();
   const db = client.db(dbNameFrom(uri));
   if (!cache.ready) {
     cache.ready = setup(db).catch((err) => {
@@ -44,7 +105,11 @@ export async function getDb() {
       throw err;
     });
   }
-  await cache.ready;
+  try {
+    await cache.ready;
+  } catch (err) {
+    throw dbError(err); // 권한 부족 등으로 인덱스·초기 데이터 생성 실패
+  }
   return db;
 }
 
