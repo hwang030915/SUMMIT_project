@@ -61,7 +61,7 @@
         codeHint.textContent = "· 인증번호가 만료되었습니다. 다시 받아주세요.";
         return;
       }
-      codeHint.textContent = `· 인증번호를 발송했습니다. 남은 시간 ${mm}:${ss} (데모 인증번호: ${demoCode})`;
+      codeHint.textContent = `· 인증번호를 발송했습니다. 남은 시간 ${mm}:${ss}${demoCode ? ` (데모 인증번호: ${demoCode})` : ""}`;
     };
     tick();
     timer = setInterval(tick, 1000);

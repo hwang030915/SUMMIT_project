@@ -2,18 +2,17 @@
  * 결산 요청 등록 폼
  * - 7.요청 등록: 저장 성공 시 onSuccess(item) 호출
  * - 8.취소: 입력 중이면 "작성 중인 내용을 취소하시겠습니까?" 확인 후 onCancel()
- * - 첨부파일: 끌어다 놓기 / 클릭 선택, 최대 5개 · 파일당 10MB
+ * - 첨부파일: 끌어다 놓기 / 클릭 선택, 최대 5개 · 합계 3MB (서버 MongoDB에 저장)
  */
 const RequestForm = (() => {
   const MEMO_MAX = 300;
-  // 이 크기 이하 파일은 내용까지 저장해 바로 내려받을 수 있음 (목업 저장 공간 한계 때문)
-  const INLINE_LIMIT = 512 * 1024;
   const ALLOWED = /\.(pdf|xlsx?|csv|docx?|hwpx?|pptx?|txt|png|jpe?g|gif|zip)$/i;
 
-  function readAsDataUrl(file) {
+  /** 파일 내용을 base64 문자열로 (data:...;base64, 앞부분 제외) */
+  function readAsBase64(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
+      reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
       reader.onerror = () => reject(new Error(`'${file.name}' 파일을 읽지 못했습니다.`));
       reader.readAsDataURL(file);
     });
@@ -79,7 +78,7 @@ const RequestForm = (() => {
           <div class="dropzone" tabindex="0" role="button" aria-labelledby="${uid}-files-label" aria-describedby="${uid}-files-hint">
             <span class="dropzone-icon">${Icons.get("upload")}</span>
             <span class="dropzone-text"><strong>파일을 끌어다 놓거나 클릭하여 선택</strong>하세요</span>
-            <span class="dropzone-hint" id="${uid}-files-hint">최대 ${Store.MAX_FILES}개 · 파일당 10MB 이하 (PDF, 엑셀, 워드, 한글, 이미지, ZIP 등)</span>
+            <span class="dropzone-hint" id="${uid}-files-hint">최대 ${Store.MAX_FILES}개 · 합계 3MB 이하 (PDF, 엑셀, 워드, 한글, 이미지, ZIP 등)</span>
           </div>
           <input type="file" class="sr-only" multiple tabindex="-1" aria-hidden="true"
             accept=".pdf,.xls,.xlsx,.csv,.doc,.docx,.hwp,.hwpx,.ppt,.pptx,.txt,.png,.jpg,.jpeg,.gif,.zip" />
@@ -160,8 +159,9 @@ const RequestForm = (() => {
           problems.push(`'${file.name}'은(는) 첨부할 수 없는 형식입니다.`);
           continue;
         }
-        if (file.size > Store.MAX_FILE_SIZE) {
-          problems.push(`'${file.name}'은(는) 10MB를 넘어 첨부할 수 없습니다.`);
+        const total = files.reduce((sum, f) => sum + f.size, 0) + file.size;
+        if (total > Store.MAX_TOTAL_SIZE) {
+          problems.push(`'${file.name}'을(를) 더하면 합계 3MB를 넘어 첨부할 수 없습니다.`);
           continue;
         }
         files.push(file);
@@ -274,7 +274,7 @@ const RequestForm = (() => {
             name: f.name,
             size: f.size,
             type: f.type,
-            dataUrl: f.size <= INLINE_LIMIT ? await readAsDataUrl(f) : null,
+            data: await readAsBase64(f),
           }))
         );
         const item = await Store.create({ ...values(), attachments });

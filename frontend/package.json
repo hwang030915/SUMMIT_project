@@ -1,0 +1,12 @@
+{
+  "name": "summit",
+  "private": true,
+  "description": "SUMMIT - 놓치기 쉬운 결산, 빠짐없이 SUMMIT",
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
+  "dependencies": {
+    "mongodb": "^6.10.0"
+  }
+}

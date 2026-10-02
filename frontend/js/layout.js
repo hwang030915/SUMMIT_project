@@ -251,7 +251,7 @@ const Layout = (() => {
       okText: "로그아웃",
     });
     if (!ok) return;
-    Auth.logout();
+    await Auth.logout();
     location.replace("login.html?msg=logout");
   }
 

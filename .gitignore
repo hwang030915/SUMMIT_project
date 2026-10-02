@@ -9,3 +9,8 @@
 Thumbs.db
 desktop.ini
 .vscode/
+
+# 의존성 / 배포 / 비밀값
+node_modules/
+.vercel/
+.env*

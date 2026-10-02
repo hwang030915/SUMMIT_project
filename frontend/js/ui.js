@@ -208,23 +208,34 @@ const UI = (() => {
     return `<span class="attach-badge" title="첨부: ${esc(names)}">${Icons.get("paperclip")}${files.length}</span>`;
   }
 
-  /** 내용이 저장된 파일은 다운로드 링크, 큰 파일은 이름만 표시 */
+  /** 첨부파일 목록 (누르면 서버에서 내려받기) */
   function attachmentList(item) {
     const files = item.attachments || [];
     if (!files.length) return '<span class="muted">없음</span>';
     return `<ul class="attach-list">${files
-      .map((f) => {
-        const label = `<span class="attach-name">${esc(f.name)}</span><span class="attach-size">${Utils.formatBytes(f.size)}</span>`;
-        return f.dataUrl
-          ? `<li><a class="attach-link" href="${esc(f.dataUrl)}" download="${esc(f.name)}" title="다운로드">${Icons.get(
-              "paperclip"
-            )}${label}${Icons.get("download")}</a></li>`
-          : `<li><span class="attach-link is-disabled" title="큰 파일은 백엔드 연결 후 다운로드할 수 있습니다.">${Icons.get(
-              "paperclip"
-            )}${label}</span></li>`;
-      })
+      .map(
+        (f) => `<li><button type="button" class="attach-link" data-download-id="${esc(f.id)}" data-download-name="${esc(
+          f.name
+        )}" title="다운로드">${Icons.get("paperclip")}<span class="attach-name">${esc(f.name)}</span><span class="attach-size">${Utils.formatBytes(
+          f.size
+        )}</span>${Icons.get("download")}</button></li>`
+      )
       .join("")}</ul>`;
   }
+
+  // 어느 화면이든 첨부파일 버튼을 누르면 내려받기
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-download-id]");
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    try {
+      await Store.downloadAttachment(btn.dataset.downloadId, btn.dataset.downloadName);
+    } catch (err) {
+      toast(err.message, "error");
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   /* ---------- 폼 도우미 ---------- */
   function setFieldError(input, message) {
