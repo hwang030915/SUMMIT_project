@@ -3,6 +3,8 @@
  *  GET                         → { items: [...] }   전체 결산 요청 (첨부파일은 이름·크기만)
  *  POST  { month, title, department, deadline, requestMemo, attachments: [{ name, type, data(base64) }] }
  *                              → { item }
+ *  POST  ?action=remind  { department, month?, note? }
+ *                              → { sent: [{ name, email }], failed: [...], items }   부서 담당자에게 독촉 메일 발송
  *  PATCH ?id=...  { action: "submit", submitter, submitMemo, submittedDate }
  *                 { action: "cancel" }
  *                              → { item }
@@ -12,6 +14,7 @@ import { ObjectId } from "mongodb";
 import { getDb, toRequest } from "./_lib/db.js";
 import { requireUser } from "./_lib/auth.js";
 import { handle, body, str, HttpError } from "./_lib/http.js";
+import { mailConfig, sendReminderMail, describeMailError, appUrl } from "./_lib/mail.js";
 import {
   DEPARTMENTS,
   MAX_FILES,
@@ -20,7 +23,11 @@ import {
   isValidDate,
   isValidMonth,
   todayKST,
+  lastMonthKST,
+  diffDays,
 } from "./_lib/rules.js";
+
+const REMIND_COOLDOWN_MIN = 10; // 같은 부서에는 10분에 한 번만 (메일 폭주 방지)
 
 function parseId(req) {
   const id = str(req.query.id);
@@ -125,4 +132,91 @@ async function update(req) {
   return { item: toRequest(doc) };
 }
 
-export default handle({ GET: list, POST: create, PATCH: update });
+/* ---------- 독촉 메일 (챗봇 '독촉 메시지 만들기' → 메일 바로 보내기) ---------- */
+async function remind(req) {
+  const db = await getDb();
+  const { user: sender } = await requireUser(req, db);
+  const b = body(req);
+  const department = str(b.department);
+  if (!DEPARTMENTS.includes(department)) throw new HttpError(400, "독촉할 부서를 선택하세요.");
+  const note = str(b.note).trim().slice(0, 500);
+
+  if (!mailConfig().enabled) {
+    throw new HttpError(503, "메일 발송이 설정되지 않았습니다. 관리자에게 SMTP_USER·SMTP_PASS 환경 변수 설정을 요청하세요.");
+  }
+
+  // 결산월: 지정값 > 지난달 > 가장 최근 결산월
+  let month = str(b.month);
+  if (!isValidMonth(month)) {
+    const months = await db.collection("requests").distinct("month");
+    month = months.includes(lastMonthKST()) ? lastMonthKST() : months.sort().pop();
+  }
+
+  const today = todayKST();
+  const items = await db
+    .collection("requests")
+    .find({ month, department, status: { $ne: "done" } }, { projection: { attachments: 0 } })
+    .sort({ deadline: 1 })
+    .toArray();
+  if (!items.length) throw new HttpError(400, `${department}에는 ${month} 결산 미제출 자료가 없습니다.`);
+
+  const recipients = await db.collection("users").find({ department }, { projection: { name: 1, email: 1 } }).toArray();
+  if (!recipients.length) {
+    throw new HttpError(404, `${department}에 가입한 SUMMIT 사용자가 없어 메일을 보낼 수 없습니다. 메시지를 복사해 직접 전달해 주세요.`);
+  }
+
+  const since = new Date(Date.now() - REMIND_COOLDOWN_MIN * 60 * 1000);
+  const recent = await db.collection("remind_logs").findOne({ department, month, createdAt: { $gt: since } });
+  if (recent) {
+    const wait = Math.max(1, Math.ceil((recent.createdAt.getTime() + REMIND_COOLDOWN_MIN * 60 * 1000 - Date.now()) / 60000));
+    throw new HttpError(429, `${department}에는 방금 독촉 메일을 보냈어요. ${wait}분 뒤에 다시 보낼 수 있습니다.`);
+  }
+
+  const mailItems = items.map((i) => ({
+    title: i.title,
+    department: i.department,
+    month: i.month,
+    deadline: i.deadline,
+    dday: diffDays(today, i.deadline),
+  }));
+  const lateCount = mailItems.filter((i) => i.dday < 0).length;
+
+  const sent = [];
+  const failed = [];
+  for (const r of recipients) {
+    try {
+      await sendReminderMail({
+        to: r.email,
+        name: r.name,
+        heading: "결산 자료 제출 요청",
+        intro: `${sender.department} ${sender.name}님이 ${month} 결산 자료 제출을 요청했습니다. 아래 자료를 메일 또는 ERP로 제출하신 뒤, SUMMIT '제출 체크'에서 제출 완료로 표시해 주세요.`,
+        note,
+        items: mailItems,
+        link: `${appUrl()}/submit.html`,
+        replyTo: sender.email,
+        subject: `[SUMMIT] ${month} 결산 자료 제출 요청 · ${department} 미제출 ${items.length}건${lateCount ? ` (지연 ${lateCount}건)` : ""}`,
+      });
+      sent.push({ name: r.name, email: r.email });
+    } catch (err) {
+      console.error("[remind]", r.email, err);
+      failed.push({ name: r.name, email: r.email, reason: describeMailError(err) });
+    }
+  }
+
+  if (!sent.length) throw new HttpError(502, `독촉 메일을 보내지 못했습니다. ${failed[0].reason}`);
+
+  await db.collection("remind_logs").insertOne({
+    department,
+    month,
+    senderId: sender._id,
+    to: sent.map((r) => r.email),
+    itemIds: items.map((i) => i._id),
+    createdAt: new Date(),
+    expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000), // 30일 뒤 자동 삭제
+  });
+  return { sent, failed, month, items: items.length };
+}
+
+const post = (req) => (str(req.query.action) === "remind" ? remind(req) : create(req));
+
+export default handle({ GET: list, POST: post, PATCH: update });

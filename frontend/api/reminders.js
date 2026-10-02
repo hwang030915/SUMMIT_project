@@ -17,18 +17,11 @@
  */
 import { getDb } from "./_lib/db.js";
 import { handle, str, HttpError } from "./_lib/http.js";
-import { mailConfig, sendReminderMail, describeMailError } from "./_lib/mail.js";
+import { mailConfig, sendReminderMail, describeMailError, appUrl } from "./_lib/mail.js";
 import { pushConfig, sendPush } from "./_lib/push.js";
 import { todayKST, addDays, diffDays } from "./_lib/rules.js";
 
 const DAYS_BEFORE = 3; // 기한 며칠 전부터 알릴지 (D-3)
-
-function appUrl() {
-  const url = (process.env.APP_URL || "").trim();
-  if (url) return url.replace(/\/+$/, "");
-  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
-  return host ? `https://${host}` : "https://summit-eight-tau.vercel.app";
-}
 
 function authorize(req) {
   const secret = (process.env.CRON_SECRET || "").trim();

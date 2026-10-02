@@ -12,6 +12,14 @@ import nodemailer from "nodemailer";
 
 const cache = (globalThis.__summitMail ||= { transport: null });
 
+/** 메일 속 'SUMMIT에서 확인하기' 링크 주소 (APP_URL > Vercel 운영 주소 > 기본 배포 주소) */
+export function appUrl() {
+  const url = (process.env.APP_URL || "").trim();
+  if (url) return url.replace(/\/+$/, "");
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+  return host ? `https://${host}` : "https://summit-eight-tau.vercel.app";
+}
+
 const clean = (v) => (v || "").trim().replace(/^["']+|["']+$/g, "").trim();
 
 export function mailConfig() {
@@ -65,14 +73,17 @@ const ddayLabel = (n) => (n > 0 ? `D-${n}` : n === 0 ? "D-day" : `D+${-n}`);
  * 제출 기한 알림 메일
  * @param {{ to: string, name: string, heading: string, intro: string,
  *           items: { title: string, department: string, month: string, deadline: string, dday: number }[],
- *           link: string }} p
+ *           link: string, note?: string, replyTo?: string, subject?: string }} p
+ *   note: 보내는 사람이 덧붙인 말 (독촉 메일), replyTo: 답장 받을 주소, subject: 제목 직접 지정
  */
-export async function sendReminderMail({ to, name, heading, intro, items, link }) {
+export async function sendReminderMail({ to, name, heading, intro, items, link, note = "", replyTo, subject: customSubject }) {
   const cfg = mailConfig();
   const lateCount = items.filter((it) => it.dday < 0).length;
-  const subject = lateCount
-    ? `[SUMMIT] 기한이 지난 결산 자료 ${lateCount}건 포함 · 미제출 ${items.length}건`
-    : `[SUMMIT] 제출 기한이 다가온 결산 자료 ${items.length}건`;
+  const subject =
+    customSubject ||
+    (lateCount
+      ? `[SUMMIT] 기한이 지난 결산 자료 ${lateCount}건 포함 · 미제출 ${items.length}건`
+      : `[SUMMIT] 제출 기한이 다가온 결산 자료 ${items.length}건`);
 
   const rows = items
     .map((it) => {
@@ -91,14 +102,16 @@ export async function sendReminderMail({ to, name, heading, intro, items, link }
     })
     .join("");
 
-  await transport(cfg).sendMail({
+  const result = await transport(cfg).sendMail({
     from: cfg.from,
     to,
+    ...(replyTo ? { replyTo } : {}),
     subject,
     text: [
       `${name}님, 안녕하세요.`,
       "",
       intro,
+      ...(note ? ["", note] : []),
       "",
       ...items.map((it) => `- [${ddayLabel(it.dday)}] ${it.title} (${it.department}, ${it.month} 결산, 기한 ${it.deadline})`),
       "",
@@ -123,6 +136,11 @@ export async function sendReminderMail({ to, name, heading, intro, items, link }
       <tr><td style="padding:20px 32px 0;">
         <h1 style="margin:0 0 8px;font-size:20px;color:#111827;">${escapeHtml(heading)}</h1>
         <p style="margin:0;font-size:15px;line-height:1.6;color:#374151;">${escapeHtml(name)}님, ${escapeHtml(intro)}</p>
+        ${
+          note
+            ? `<p style="margin:12px 0 0;padding:12px 14px;border-left:3px solid #ff6a3d;border-radius:8px;background:#fff6f1;font-size:14px;line-height:1.6;color:#374151;white-space:pre-line;">${escapeHtml(note)}</p>`
+            : ""
+        }
       </td></tr>
       <tr><td style="padding:12px 32px 0;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
@@ -134,6 +152,9 @@ export async function sendReminderMail({ to, name, heading, intro, items, link }
   </td></tr></table>
 </body></html>`,
   });
+  if (!result.accepted?.length || result.rejected?.length) {
+    throw Object.assign(new Error("SMTP recipient rejected"), { code: "EENVELOPE" });
+  }
 }
 
 export async function sendResetCodeMail({ to, name, code, minutes }) {

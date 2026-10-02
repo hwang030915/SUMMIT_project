@@ -271,8 +271,15 @@
     const links = (m.links || [])
       .map((l) => `<a class="btn btn-outline btn-xs" href="${esc(l.href)}">${esc(l.label)}</a>`)
       .join("");
-    const copy = m.copyText ? `<button type="button" class="btn btn-primary btn-xs" data-copy>${Icons.get("check")}메시지 복사</button>` : "";
-    return links || copy ? `<div class="moa-actions">${copy}${links}</div>` : "";
+    const send = m.remind
+      ? m.remindSent
+        ? `<button type="button" class="btn btn-secondary btn-xs" disabled>${Icons.get("check")}메일 보냄</button>`
+        : `<button type="button" class="btn btn-primary btn-xs" data-send-remind>${Icons.get("send")}메일 바로 보내기</button>`
+      : "";
+    const copy = m.copyText
+      ? `<button type="button" class="btn ${m.remind ? "btn-outline" : "btn-primary"} btn-xs" data-copy>${Icons.get("check")}메시지 복사</button>`
+      : "";
+    return links || copy || send ? `<div class="moa-actions">${send}${copy}${links}</div>` : "";
   }
 
   function resultHtml(m) {
@@ -530,13 +537,53 @@
       `감사합니다.`,
     ].join("\n");
 
-    const to = data.dir.filter((u) => u.department === dept).map((u) => u.email);
-    const mailto = `mailto:${to.join(",")}?subject=${encodeURIComponent(`[SUMMIT] ${data.label} 결산 자료 제출 요청 (${dept})`)}&body=${encodeURIComponent(message)}`;
+    const members = data.dir.filter((u) => u.department === dept);
+    const mailto = `mailto:${members.map((u) => u.email).join(",")}?subject=${encodeURIComponent(
+      `[SUMMIT] ${data.label} 결산 자료 제출 요청 (${dept})`
+    )}&body=${encodeURIComponent(message)}`;
     await botSay({
-      text: `**${dept}**에 보낼 독촉 메시지 초안이에요. 복사해서 메신저나 메일로 보내 보세요.\n\n${message}`,
+      text: members.length
+        ? `**${dept}**에 보낼 독촉 메시지예요.\n**[메일 바로 보내기]**를 누르면 ${dept} 담당자 ${members.length}명(${members
+            .map((u) => u.name)
+            .join(", ")})에게 SUMMIT이 메일을 보내요.\n\n${message}`
+        : `**${dept}**에 보낼 독촉 메시지 초안이에요.\n${dept}에는 SUMMIT에 가입한 담당자가 없어서, 복사해서 메신저나 메일로 직접 보내 주세요.\n\n${message}`,
       copyText: message,
-      links: [{ label: to.length ? `${dept}에 메일 보내기` : "메일 앱으로 보내기", href: mailto }],
+      remind: members.length ? { department: dept, month: data.month, to: members.map((u) => u.name) } : null,
+      links: [{ label: "내 메일 앱으로 보내기", href: mailto }],
     });
+  }
+
+  /** [메일 바로 보내기]: 서버가 부서 담당자에게 실제 메일 발송 */
+  async function sendReminder(m, btn) {
+    if (!m.remind || m.remindSent || busy) return;
+    const { department, month, to } = m.remind;
+    const ok = await UI.confirm({
+      icon: "send",
+      title: `${department}에 독촉 메일을 보낼까요?`,
+      message: `${to.join(", ")}님에게 미제출 자료 목록이 담긴 메일이 발송돼요.`,
+      okText: "보내기",
+    });
+    if (!ok) return;
+
+    busy = true;
+    UI.setButtonLoading(btn, true, "보내는 중...");
+    try {
+      const result = await Api.request("requests?action=remind", { method: "POST", body: { department, month } });
+      update(m, { remindSent: true });
+      const names = result.sent.map((r) => r.name).join(", ");
+      const failNote = result.failed.length
+        ? `\n다만 ${result.failed.map((f) => f.name).join(", ")}님에게는 보내지 못했어요. (${result.failed[0].reason})`
+        : "";
+      await botSay({
+        text: `✉️ **${department}** 담당자 ${result.sent.length}명(${names})에게 독촉 메일을 보냈어요!\n미제출 ${result.items}건 목록이 함께 전달됐고, 답장은 ${user.email}(으)로 와요.${failNote}`,
+        aiText: `${department}에 독촉 메일 발송 완료 (${names})`,
+      });
+    } catch (err) {
+      UI.setButtonLoading(btn, false);
+      await botSay({ text: `메일을 보내지 못했어요. ${err.message}\n\n급하면 **[메시지 복사]**나 **[내 메일 앱으로 보내기]**를 이용해 주세요.` });
+    } finally {
+      busy = false;
+    }
   }
 
   /* =========================================================
@@ -964,6 +1011,13 @@
     if (chip && !chip.disabled) {
       const m = msgOf(chip);
       if (m && !m.answered) onChoice(m, chip.dataset.chip);
+      return;
+    }
+
+    const sendBtn = find("[data-send-remind]");
+    if (sendBtn) {
+      const m = msgOf(sendBtn);
+      if (m) sendReminder(m, sendBtn);
       return;
     }
 
