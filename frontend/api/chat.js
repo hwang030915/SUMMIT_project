@@ -31,6 +31,9 @@ const SYSTEM_PROMPT = `당신은 'SUMMIT'의 AI 금융 비서 '모아'입니다.
 - 금융·회계·결산과 관계없는 질문에는 모아가 도울 수 있는 주제(지출 분석, 예산, 세금, 금융상품)를 짧게 안내합니다.
 - SUMMIT 사용법 질문: 결산 현황(진행률·필터·검색), 결산 요청 등록(첨부파일 3MB), 제출 체크(제출 완료·취소) 화면이 있습니다.`;
 
+const AI_RETRY_MS = 10 * 60 * 1000; // 크레딧 부족·키 오류 후 10분 뒤 다시 시도
+let aiDisabledUntil = 0;
+
 let client = null;
 const getClient = () => (client ||= new Anthropic()); // ANTHROPIC_API_KEY를 환경 변수에서 읽음
 
@@ -78,6 +81,11 @@ async function chat(req, res) {
     send(res, 503, { code: "NO_AI", error: "AI 답변이 설정되지 않았습니다." });
     return;
   }
+  // 최근에 크레딧 부족·키 오류가 났으면 한동안 호출하지 않음 (불필요한 실패 호출 방지)
+  if (Date.now() < aiDisabledUntil) {
+    send(res, 503, { code: "NO_AI", error: "AI 답변을 잠시 사용할 수 없어 기본 안내로 도와드릴게요." });
+    return;
+  }
   await checkRateLimit(db, user);
 
   try {
@@ -103,9 +111,19 @@ async function chat(req, res) {
     return { reply: response.stop_reason === "max_tokens" ? `${reply}…` : reply };
   } catch (err) {
     if (err instanceof HttpError) throw err;
-    if (err instanceof Anthropic.AuthenticationError) {
-      console.error("[chat] invalid ANTHROPIC_API_KEY");
-      send(res, 503, { code: "NO_AI", error: "AI 답변 설정(API 키)을 확인해주세요." });
+    // 키가 틀렸거나 권한이 없거나 크레딧이 없으면: 키가 없을 때처럼 기본 안내 모드로 전환
+    const reason =
+      err instanceof Anthropic.AuthenticationError
+        ? "API 키가 올바르지 않습니다"
+        : err instanceof Anthropic.PermissionDeniedError
+          ? "API 키에 사용 권한이 없습니다"
+          : err instanceof Anthropic.BadRequestError && /credit balance/i.test(err.message)
+            ? "Claude API 크레딧이 부족합니다"
+            : null;
+    if (reason) {
+      console.error(`[chat] AI 비활성화: ${reason}`);
+      aiDisabledUntil = Date.now() + AI_RETRY_MS;
+      send(res, 503, { code: "NO_AI", error: `${reason}. 기본 안내로 도와드릴게요.` });
       return;
     }
     if (err instanceof Anthropic.RateLimitError) {

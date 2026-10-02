@@ -9,6 +9,7 @@ const Layout = (() => {
     { key: "dashboard", href: "main.html", label: "결산 현황", icon: "chart" },
     { key: "request", href: "request.html", label: "결산 요청 등록", icon: "plusCircle" },
     { key: "submit", href: "submit.html", label: "제출 체크", icon: "checkSquare" },
+    { key: "chat", href: "chat.html", label: "AI 비서 모아", icon: "chat" },
   ];
 
   let user = null;

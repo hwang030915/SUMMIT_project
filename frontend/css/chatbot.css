@@ -864,3 +864,122 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ---------- 'AI 비서 모아' 메뉴 화면 (크게 보기) ---------- */
+.moa-page {
+  height: calc(100vh - 190px);
+  min-height: 560px;
+  margin-top: 24px;
+}
+
+.moa-panel.is-embedded {
+  position: static;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  box-shadow: 0 4px 18px -8px rgba(17, 24, 39, 0.1);
+  animation: none;
+}
+
+.moa-panel.is-embedded .moa-close {
+  display: none;
+}
+
+/* 첫 화면: 넓은 화면에서도 가운데 정렬 */
+.moa-panel.is-embedded .moa-welcome {
+  align-items: center;
+  justify-content: center;
+}
+
+.moa-panel.is-embedded .moa-welcome > * {
+  width: 100%;
+  max-width: 560px;
+}
+
+.moa-panel.is-embedded .moa-welcome .moa-face {
+  width: 170px;
+  height: 170px;
+}
+
+.moa-panel.is-embedded .moa-welcome .moa-form {
+  margin-top: 8px;
+}
+
+.moa-panel.is-embedded .moa-quick {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.moa-panel.is-embedded .moa-quick button {
+  flex-direction: column;
+  gap: 6px;
+  height: 92px;
+}
+
+/* 대화: 넓은 화면에서 읽기 좋은 폭 */
+.moa-panel.is-embedded .moa-rail {
+  width: 84px;
+  gap: 8px;
+  padding-top: 22px;
+}
+
+.moa-panel.is-embedded .moa-rail button {
+  width: 64px;
+  font-size: 12px;
+}
+
+.moa-panel.is-embedded .moa-messages {
+  padding: 24px max(24px, calc((100% - 860px) / 2));
+}
+
+.moa-panel.is-embedded .moa-col {
+  max-width: 70%;
+}
+
+.moa-panel.is-embedded .moa-row.is-wide .moa-col {
+  max-width: 640px;
+}
+
+.moa-panel.is-embedded .moa-cards {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.moa-panel.is-embedded .moa-form {
+  padding: 14px max(24px, calc((100% - 860px) / 2)) 20px;
+}
+
+.moa-panel.is-embedded .moa-settings {
+  padding: 28px max(24px, calc((100% - 640px) / 2));
+}
+
+@media (max-width: 900px) {
+  .moa-page {
+    height: calc(100vh - 260px);
+    min-height: 480px;
+    margin-top: 16px;
+  }
+
+  .moa-panel.is-embedded .moa-quick,
+  .moa-panel.is-embedded .moa-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .moa-panel.is-embedded .moa-col {
+    max-width: 85%;
+  }
+}
+
+@media (max-width: 560px) {
+  .moa-panel.is-embedded {
+    position: static;
+    border-radius: 14px;
+  }
+
+  .moa-panel.is-embedded .moa-rail {
+    width: 56px;
+  }
+
+  .moa-panel.is-embedded .moa-rail button {
+    width: 46px;
+  }
+}

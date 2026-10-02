@@ -270,7 +270,16 @@
       </div>
     </div>`;
 
-  document.body.append(launcher, panel);
+  // 'AI 비서 모아' 메뉴 화면(chat.html)에서는 화면 안에 크게, 그 밖의 화면에서는 오른쪽 아래 떠 있는 버튼으로
+  const host = document.getElementById("moaPage");
+  const embedded = Boolean(host);
+  if (embedded) {
+    panel.classList.add("is-embedded");
+    panel.removeAttribute("role");
+    host.appendChild(panel);
+  } else {
+    document.body.append(launcher, panel);
+  }
 
   const welcomeEl = panel.querySelector(".moa-welcome");
   const chatEl = panel.querySelector(".moa-chat");
@@ -762,6 +771,7 @@
       <div class="moa-setting"><div>AI 자유 질문 답변<small>입력창에 쓴 질문을 AI가 답해요</small></div><span class="moa-status" data-ai-status>확인 중</span></div>
       <div class="moa-setting"><div>대화 내용 지우기<small>이 탭에 저장된 모아와의 대화를 모두 지워요</small></div><button type="button" class="btn btn-outline btn-xs" data-clear>지우기</button></div>
       <div class="moa-setting"><div>처음 화면으로<small>모아 소개 화면으로 돌아가요</small></div><button type="button" class="btn btn-outline btn-xs" data-home>이동</button></div>
+      ${embedded ? "" : `<div class="moa-setting"><div>크게 보기<small>'AI 비서 모아' 메뉴 화면에서 넓게 대화해요</small></div><a class="btn btn-outline btn-xs" href="chat.html">열기</a></div>`}
       <p class="moa-disclaimer">모아의 안내는 일반적인 참고 정보예요. 세금 신고나 금융상품 가입 전에는 국세청 홈택스, 금융회사 설명서, 전문가를 통해 꼭 확인해 주세요. 주민등록번호·계좌 비밀번호 같은 개인정보는 입력하지 마세요.</p>`;
 
     const status = settingsEl.querySelector("[data-ai-status]");
@@ -828,11 +838,15 @@
     launcher.focus();
   }
 
-  launcher.addEventListener("click", openPanel);
-  panel.querySelector(".moa-close").addEventListener("click", closePanel);
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !panel.hidden && !document.querySelector(".modal-backdrop")) closePanel();
-  });
+  if (embedded) {
+    openPanel(); // 전용 화면은 항상 열려 있음
+  } else {
+    launcher.addEventListener("click", openPanel);
+    panel.querySelector(".moa-close").addEventListener("click", closePanel);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !panel.hidden && !document.querySelector(".modal-backdrop")) closePanel();
+    });
+  }
 
   panel.addEventListener("submit", (e) => {
     const form = e.target.closest("[data-form]");
@@ -911,9 +925,9 @@
     if (find("[data-home]")) return goHome();
   });
 
-  // 처음 한 번 말풍선 안내
+  // 처음 한 번 말풍선 안내 (떠 있는 버튼일 때만)
   try {
-    if (!sessionStorage.getItem("moa.tipShown")) {
+    if (!embedded && !sessionStorage.getItem("moa.tipShown")) {
       sessionStorage.setItem("moa.tipShown", "1");
       const tip = document.createElement("div");
       tip.className = "moa-tip";
