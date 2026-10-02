@@ -4,10 +4,8 @@
 
 ## 배포 주소
 
-> 배포 완료 후 인터넷 주소를 입력해 주세요.
-
-- 서비스: 준비 중
-- 저장소: 준비 중
+- 서비스: https://summit-eight-tau.vercel.app
+- 저장소: https://github.com/hwang030915/SUMMIT_project
 
 ## 프로젝트 개요
 

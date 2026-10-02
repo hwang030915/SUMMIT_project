@@ -6,7 +6,7 @@
  *  GET  me              (로그인 필요)                  → { user }
  *  PATCH profile        { role } (로그인 필요)          → { user }
  *  POST password        { newPassword } (로그인 필요)
- *  POST reset-request   { name, email }                → { expiresAt, demoCode }
+ *  POST reset-request   { name, email }                → { expiresAt, delivery: "email"|"demo", demoCode }
  *  POST reset-verify    { email, code }                → { resetToken }
  *  POST reset-confirm   { email, resetToken, newPassword }
  */
@@ -14,8 +14,11 @@ import { getDb } from "./_lib/db.js";
 import { handle, body, str, HttpError } from "./_lib/http.js";
 import { hashPassword, verifyPassword, createSession, requireUser, publicUser, randomToken } from "./_lib/auth.js";
 import { EMAIL_PATTERN, PASSWORD_PATTERN, PASSWORD_HINT, ROLES } from "./_lib/rules.js";
+import { mailConfig, sendResetCodeMail, describeMailError } from "./_lib/mail.js";
+import { randomInt } from "node:crypto";
 
 const RESET_MINUTES = 3;
+const RESEND_SECONDS = 60;
 const RESET_MAX_TRIES = 5;
 const normEmail = (v) => str(v).trim().toLowerCase();
 
@@ -97,20 +100,44 @@ const actions = {
     const user = await db.collection("users").findOne({ email, name: str(b.name).trim() });
     if (!user) throw new HttpError(404, "입력하신 이름과 이메일로 가입된 계정이 없습니다.");
 
-    const code = String(Math.floor(100000 + Math.random() * 900000));
+    // 메일 폭주 방지: 같은 이메일은 60초에 한 번만
+    const recent = await db.collection("resets").findOne({ email, createdAt: { $gt: new Date(Date.now() - RESEND_SECONDS * 1000) } });
+    if (recent) {
+      const wait = Math.ceil((recent.createdAt.getTime() + RESEND_SECONDS * 1000 - Date.now()) / 1000);
+      throw new HttpError(429, `인증번호를 방금 보냈습니다. ${wait}초 뒤에 다시 받을 수 있습니다.`);
+    }
+
+    const code = randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + RESET_MINUTES * 60 * 1000);
     await db.collection("resets").deleteMany({ email });
-    await db.collection("resets").insertOne({
+    const { insertedId } = await db.collection("resets").insertOne({
       email,
       codeHash: await hashPassword(code),
       tries: 0,
       verified: false,
+      createdAt: new Date(),
       expiresAt,
     });
-    // 메일 발송 서비스가 아직 없어 시연용으로 인증번호를 응답에 포함합니다.
-    // 실제 운영 시 SHOW_RESET_CODE=false로 끄고 메일 발송으로 바꿔야 합니다.
-    const demoCode = process.env.SHOW_RESET_CODE === "false" ? null : code;
-    return { expiresAt: expiresAt.toISOString(), demoCode };
+
+    const mail = mailConfig();
+    if (mail.enabled) {
+      try {
+        await sendResetCodeMail({ to: email, name: user.name, code, minutes: RESET_MINUTES });
+      } catch (err) {
+        console.error("[mail]", err);
+        await db.collection("resets").deleteOne({ _id: insertedId }); // 못 보낸 인증번호는 무효
+        throw new HttpError(502, `${describeMailError(err)} 잠시 후 다시 시도하세요.`);
+      }
+      return { expiresAt: expiresAt.toISOString(), delivery: "email", demoCode: null };
+    }
+
+    // 메일 설정(SMTP_USER/SMTP_PASS)이 없으면 시연 모드: 인증번호를 화면에 표시
+    // 운영에서 이 동작을 막으려면 SHOW_RESET_CODE=false
+    if (process.env.SHOW_RESET_CODE === "false") {
+      await db.collection("resets").deleteOne({ _id: insertedId });
+      throw new HttpError(503, "메일 발송이 설정되지 않아 인증번호를 보낼 수 없습니다. 관리자에게 문의하세요.");
+    }
+    return { expiresAt: expiresAt.toISOString(), delivery: "demo", demoCode: code };
   },
 
   async "reset-verify"(req, db) {

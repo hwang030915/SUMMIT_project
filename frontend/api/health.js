@@ -4,6 +4,7 @@
  */
 import { getDb, readUri, diagnose } from "./_lib/db.js";
 import { send } from "./_lib/http.js";
+import { mailConfig } from "./_lib/mail.js";
 
 export default async function handler(req, res) {
   const uri = readUri();
@@ -13,6 +14,8 @@ export default async function handler(req, res) {
     자리표시자_남아있음: /<[^>]*>/.test(uri),
     앞뒤_따옴표_공백_제거함: Boolean(process.env.MONGODB_URI) && process.env.MONGODB_URI !== uri,
     Vercel_환경: process.env.VERCEL_ENV || "local",
+    메일_발송_설정됨: mailConfig().enabled,
+    메일_서버: mailConfig().enabled ? `${mailConfig().host}:${mailConfig().port}` : "-",
   };
 
   try {

@@ -50,7 +50,7 @@
   }
 
   /* ---------- 인증번호 받기 + 3분 타이머 ---------- */
-  function startTimer(expiresAt, demoCode) {
+  function startTimer(expiresAt, demoCode, email) {
     clearInterval(timer);
     const tick = () => {
       const left = Math.max(0, Math.round((expiresAt - Date.now()) / 1000));
@@ -61,7 +61,9 @@
         codeHint.textContent = "· 인증번호가 만료되었습니다. 다시 받아주세요.";
         return;
       }
-      codeHint.textContent = `· 인증번호를 발송했습니다. 남은 시간 ${mm}:${ss}${demoCode ? ` (데모 인증번호: ${demoCode})` : ""}`;
+      codeHint.textContent = demoCode
+        ? `· 메일 발송이 설정되지 않은 시연 모드입니다. 인증번호: ${demoCode} · 남은 시간 ${mm}:${ss}`
+        : `· ${email}(으)로 인증번호를 보냈습니다. 메일이 없으면 스팸함을 확인하세요. 남은 시간 ${mm}:${ss}`;
     };
     tick();
     timer = setInterval(tick, 1000);
@@ -74,10 +76,12 @@
     UI.setButtonLoading(sendCodeBtn, true, "발송 중...");
     try {
       const { code, expiresAt } = await Auth.requestResetCode(nameInput.value, emailInput.value);
+      // 재전송은 60초 뒤부터 (서버 제한과 같게)
+      sendCodeBtn.disabled = true;
+      setTimeout(() => (sendCodeBtn.disabled = false), 60 * 1000);
       codeRequested = true;
-      UI.setButtonLoading(sendCodeBtn, false);
-      sendCodeBtn.textContent = "재전송";
-      startTimer(expiresAt, code);
+      sendCodeBtn.innerHTML = "재전송";
+      startTimer(expiresAt, code, emailInput.value.trim());
       codeInput.focus();
     } catch (err) {
       UI.setButtonLoading(sendCodeBtn, false);
