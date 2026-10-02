@@ -983,3 +983,50 @@
     width: 46px;
   }
 }
+
+/* 결산 상담: 말풍선 아래 버튼, 원형 진행률 숫자, 지연 강조 */
+.moa-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.moa-actions .btn {
+  height: 32px;
+  font-size: 12.5px;
+}
+
+.moa-actions .btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.moa-pie {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.moa-pie::before {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.moa-pie b {
+  position: relative;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.moa-slide.is-alert {
+  border-color: var(--danger-border);
+}
+
+.moa-slide.is-alert strong {
+  color: var(--danger-text);
+}

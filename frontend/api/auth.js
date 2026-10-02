@@ -75,6 +75,17 @@ const actions = {
     return { user: publicUser(user) };
   },
 
+  /** 결산 담당자 문의용 사내 연락처 (로그인한 사용자만) */
+  async directory(req, db) {
+    await requireUser(req, db);
+    const users = await db
+      .collection("users")
+      .find({}, { projection: { name: 1, email: 1, department: 1, role: 1 } })
+      .sort({ department: 1, name: 1 })
+      .toArray();
+    return { users: users.map(publicUser) };
+  },
+
   async profile(req, db) {
     const { user } = await requireUser(req, db);
     const role = str(body(req).role);
@@ -173,7 +184,7 @@ const actions = {
   },
 };
 
-const METHOD_OF = { me: "GET", profile: "PATCH" };
+const METHOD_OF = { me: "GET", directory: "GET", profile: "PATCH" };
 
 async function run(req) {
   const action = str(req.query.action);
