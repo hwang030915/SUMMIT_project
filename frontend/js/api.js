@@ -60,7 +60,10 @@ const Api = (() => {
     handleUnauthorized(res, options.auth !== false);
     if (!res.ok) {
       if (res.status === 413) throw new Error("파일이 너무 큽니다. 첨부파일 합계를 3MB 이하로 줄여주세요.");
-      throw new Error((data && data.error) || `요청에 실패했습니다. (${res.status})`);
+      const err = new Error((data && data.error) || `요청에 실패했습니다. (${res.status})`);
+      err.status = res.status;
+      err.code = data && data.code;
+      throw err;
     }
     return data;
   }

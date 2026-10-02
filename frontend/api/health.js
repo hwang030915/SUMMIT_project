@@ -15,6 +15,7 @@ export default async function handler(req, res) {
     앞뒤_따옴표_공백_제거함: Boolean(process.env.MONGODB_URI) && process.env.MONGODB_URI !== uri,
     Vercel_환경: process.env.VERCEL_ENV || "local",
     메일_발송_설정됨: mailConfig().enabled,
+    AI_답변_설정됨: Boolean(process.env.ANTHROPIC_API_KEY),
     메일_서버: mailConfig().enabled ? `${mailConfig().host}:${mailConfig().port}` : "-",
   };
 

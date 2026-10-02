@@ -122,6 +122,8 @@ async function setup(db) {
     db.collection("resets").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection("requests").createIndex({ month: 1, deadline: 1 }),
     db.collection("attachments").createIndex({ requestId: 1 }),
+    db.collection("chat_usage").createIndex({ userId: 1, createdAt: 1 }),
+    db.collection("chat_usage").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
   ]);
   await seedUsers(db);
   await seedRequests(db);
