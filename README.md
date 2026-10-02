@@ -7,6 +7,41 @@
 - 서비스: https://summit-eight-tau.vercel.app
 - 저장소: https://github.com/hwang030915/SUMMIT_project
 
+## 비밀번호 찾기 메일 설정
+
+비밀번호 찾기는 가입한 이메일로 6자리 인증번호를 발송합니다. 인증번호는 3분 동안 유효하며 재전송은 60초 후 가능합니다. 번호는 API 응답이나 화면에 표시하지 않습니다. SMTP 설정이 없거나 발송에 실패하면 오류를 표시하며, 화면 표시 데모 모드로 전환하지 않습니다. 기존 `SHOW_RESET_CODE` 환경변수는 더 이상 사용하지 않습니다.
+
+### Gmail 발신 계정 준비
+
+1. 발신용 Google 계정에서 2단계 인증을 켭니다.
+2. [Google 앱 비밀번호](https://myaccount.google.com/apppasswords)에서 SUMMIT용 앱 비밀번호를 만듭니다. 일반 로그인 비밀번호를 사용하지 않습니다. 계정 정책에 따라 앱 비밀번호를 사용할 수 없는 경우 다른 SMTP 발신 서비스를 사용하세요. [Google 공식 안내](https://support.google.com/accounts/answer/185833?hl=ko)
+3. 아래 값을 Vercel 프로젝트의 Settings → Environment Variables에 추가합니다. 실제 비밀번호는 GitHub나 채팅에 올리지 않습니다.
+
+| 변수 | Gmail 기준 값 |
+| --- | --- |
+| `SMTP_HOST` | `smtp.gmail.com` |
+| `SMTP_PORT` | `465` |
+| `SMTP_USER` | 발신 Gmail 주소 |
+| `SMTP_PASS` | 발신 계정의 앱 비밀번호 |
+| `MAIL_FROM` | 선택. 기본값은 `SUMMIT <SMTP_USER>`이며 발신 권한이 있는 주소만 사용 |
+
+Production 및 사용할 Preview 환경에 설정한 뒤 **재배포**하세요. DB용 `MONGODB_URI`도 필요하며, 선택 변수 `MONGODB_DB`는 미설정 시 URI의 DB 이름 또는 `summit`을 사용합니다. 이 저장소의 Vercel Root Directory는 `frontend`입니다.
+
+### 로컬 실행과 검증
+
+Node.js 22에서 `frontend` 폴더로 이동하여 `npm ci`를 실행합니다. `.env.example`을 `.env.local`로 복사하고 실제 DB·SMTP 값을 입력한 뒤 `npx vercel dev`로 실행하세요. HTML만 여는 방식이나 정적 파일 서버는 API를 실행하지 않습니다.
+
+`npm test`는 실제 DB와 메일 발송을 대체한 회귀 검사입니다. 실제 메일 수신은 별도로 다음 순서로 확인하세요.
+
+1. 수신 가능한 본인 이메일로 회원가입합니다. 기본 시연 계정 주소는 수신 테스트에 쓰지 않습니다.
+2. 비밀번호 찾기에서 가입한 이름·이메일로 인증번호를 요청합니다.
+3. 받은편지함과 스팸함에서 SUMMIT 인증 메일을 확인합니다.
+4. 번호를 입력하고 3분 이내에 새 비밀번호를 저장합니다.
+5. 이전 비밀번호는 실패하고 새 비밀번호로 로그인되는지 확인합니다.
+6. 잘못된 번호·만료·재전송·SMTP 설정 오류에서도 번호 노출 없이 안내되는지 확인합니다.
+
+SMTP 서버의 접수 성공이 받은편지함 도착을 보장하지는 않습니다. 메일이 없다면 스팸함, 수신 주소, 발신 계정의 반송 메일을 확인하세요. TLS 연결 및 465/587 포트 설정은 [Nodemailer SMTP 문서](https://nodemailer.com/smtp)를 참고하세요.
+
 ## 프로젝트 개요
 
 | 항목 | 내용 |

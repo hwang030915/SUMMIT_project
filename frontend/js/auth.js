@@ -70,12 +70,13 @@ const Auth = (() => {
 
   /* ---------- 비밀번호 찾기 ---------- */
   async function requestResetCode(name, email) {
-    const { expiresAt, demoCode, delivery } = await Api.request("auth?action=reset-request", {
+    resetToken = null;
+    const { expiresAt, retryAt } = await Api.request("auth?action=reset-request", {
       method: "POST",
       body: { name, email },
       auth: false,
     });
-    return { code: demoCode, delivery, expiresAt: new Date(expiresAt).getTime() };
+    return { retryAt: new Date(retryAt).getTime(), expiresAt: new Date(expiresAt).getTime() };
   }
 
   async function verifyResetCode(email, code) {

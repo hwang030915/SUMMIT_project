@@ -21,6 +21,8 @@
   let codeRequested = false;
   let timer = null;
   let verifiedEmail = "";
+  let sending = false;
+  let resendTimer = null;
 
   $("passwordHint").textContent = Auth.PASSWORD_HINT;
   UI.bindPasswordToggle($("toggleNew"), newPassword);
@@ -50,42 +52,58 @@
   }
 
   /* ---------- 인증번호 받기 + 3분 타이머 ---------- */
-  function startTimer(expiresAt, demoCode, email) {
+  function startTimer(expiresAt, email) {
     clearInterval(timer);
     const tick = () => {
       const left = Math.max(0, Math.round((expiresAt - Date.now()) / 1000));
       const mm = Math.floor(left / 60);
       const ss = String(left % 60).padStart(2, "0");
       if (left === 0) {
+        codeRequested = false;
         clearInterval(timer);
         codeHint.textContent = "· 인증번호가 만료되었습니다. 다시 받아주세요.";
         return;
       }
-      codeHint.textContent = demoCode
-        ? `· 메일 발송이 설정되지 않은 시연 모드입니다. 인증번호: ${demoCode} · 남은 시간 ${mm}:${ss}`
-        : `· ${email}(으)로 인증번호를 보냈습니다. 메일이 없으면 스팸함을 확인하세요. 남은 시간 ${mm}:${ss}`;
+      codeHint.textContent = `· ${email}(으)로 인증번호를 보냈습니다. 메일이 없으면 스팸함을 확인하세요. 남은 시간 ${mm}:${ss}`;
     };
     tick();
     timer = setInterval(tick, 1000);
   }
 
   sendCodeBtn.addEventListener("click", async () => {
+    if (sending || sendCodeBtn.disabled) return;
     UI.showFormAlert(verifyAlert, "");
     if (!validateIdentity()) return;
-
+    const name = nameInput.value.trim();
+    const email = emailInput.value.trim();
+    sending = true;
+    nameInput.disabled = emailInput.disabled = verifyBtn.disabled = true;
+    codeRequested = false;
+    clearInterval(timer);
+    codeInput.value = "";
+    codeHint.textContent = DEFAULT_HINT;
     UI.setButtonLoading(sendCodeBtn, true, "발송 중...");
     try {
-      const { code, expiresAt } = await Auth.requestResetCode(nameInput.value, emailInput.value);
-      // 재전송은 60초 뒤부터 (서버 제한과 같게)
-      sendCodeBtn.disabled = true;
-      setTimeout(() => (sendCodeBtn.disabled = false), 60 * 1000);
+      const { expiresAt, retryAt } = await Auth.requestResetCode(name, email);
+      UI.setButtonLoading(sendCodeBtn, false);
+      clearInterval(resendTimer);
+      const tickResend = () => {
+        const seconds = Math.max(0, Math.ceil((retryAt - Date.now()) / 1000));
+        sendCodeBtn.disabled = seconds > 0;
+        sendCodeBtn.textContent = seconds ? `재전송 (${seconds}초)` : "재전송";
+        if (!seconds) clearInterval(resendTimer);
+      };
+      resendTimer = setInterval(tickResend, 1000);
+      tickResend();
       codeRequested = true;
-      sendCodeBtn.innerHTML = "재전송";
-      startTimer(expiresAt, code, emailInput.value.trim());
+      startTimer(expiresAt, email);
       codeInput.focus();
     } catch (err) {
       UI.setButtonLoading(sendCodeBtn, false);
       UI.showFormAlert(verifyAlert, err.message);
+    } finally {
+      sending = false;
+      nameInput.disabled = emailInput.disabled = verifyBtn.disabled = false;
     }
   });
 
@@ -95,6 +113,9 @@
       if (!codeRequested) return;
       codeRequested = false;
       clearInterval(timer);
+      clearInterval(resendTimer);
+      sendCodeBtn.disabled = false;
+      codeInput.value = "";
       codeHint.textContent = DEFAULT_HINT;
       sendCodeBtn.textContent = "인증번호 받기";
     })
@@ -103,6 +124,7 @@
   /* ---------- 1단계 제출: 인증번호 확인 ---------- */
   verifyForm.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (sending || verifyBtn.disabled) return;
     UI.showFormAlert(verifyAlert, "");
     if (!validateIdentity()) return;
 

@@ -30,6 +30,7 @@ function transport(cfg) {
       host: cfg.host,
       port: cfg.port,
       secure: cfg.port === 465,
+      requireTLS: cfg.port !== 465,
       auth: { user: cfg.user, pass: cfg.pass },
       connectionTimeout: 8000,
       greetingTimeout: 8000,
@@ -56,6 +57,7 @@ export function describeMailError(err) {
 
 export async function sendResetCodeMail({ to, name, code, minutes }) {
   const cfg = mailConfig();
+  if (!cfg.enabled) throw Object.assign(new Error("SMTP is not configured"), { code: "EAUTH" });
   const safeName = String(name).replace(/[<>&"]/g, "");
   const digits = code
     .split("")
@@ -65,7 +67,7 @@ export async function sendResetCodeMail({ to, name, code, minutes }) {
     )
     .join("");
 
-  await transport(cfg).sendMail({
+  const result = await transport(cfg).sendMail({
     from: cfg.from,
     to,
     subject: `[SUMMIT] 비밀번호 재설정 인증번호 ${code}`,
@@ -108,4 +110,7 @@ export async function sendResetCodeMail({ to, name, code, minutes }) {
   </td></tr></table>
 </body></html>`,
   });
+  if (!result.accepted?.length || result.rejected?.length) {
+    throw Object.assign(new Error("SMTP recipient rejected"), { code: "EENVELOPE" });
+  }
 }

@@ -6,7 +6,7 @@
  *  GET  me              (로그인 필요)                  → { user }
  *  PATCH profile        { role } (로그인 필요)          → { user }
  *  POST password        { newPassword } (로그인 필요)
- *  POST reset-request   { name, email }                → { expiresAt, delivery: "email"|"demo", demoCode }
+ *  POST reset-request   { name, email }                → { expiresAt, retryAt }
  *  POST reset-verify    { email, code }                → { resetToken }
  *  POST reset-confirm   { email, resetToken, newPassword }
  */
@@ -100,6 +100,10 @@ const actions = {
     const user = await db.collection("users").findOne({ email, name: str(b.name).trim() });
     if (!user) throw new HttpError(404, "입력하신 이름과 이메일로 가입된 계정이 없습니다.");
 
+    if (!mailConfig().enabled) {
+      throw new HttpError(503, "메일 발송이 설정되지 않아 인증번호를 보낼 수 없습니다. 관리자에게 문의하세요.");
+    }
+
     // 메일 폭주 방지: 같은 이메일은 60초에 한 번만
     const recent = await db.collection("resets").findOne({ email, createdAt: { $gt: new Date(Date.now() - RESEND_SECONDS * 1000) } });
     if (recent) {
@@ -115,35 +119,26 @@ const actions = {
       codeHash: await hashPassword(code),
       tries: 0,
       verified: false,
+      delivery: "pending",
       createdAt: new Date(),
       expiresAt,
     });
 
-    const mail = mailConfig();
-    if (mail.enabled) {
-      try {
-        await sendResetCodeMail({ to: email, name: user.name, code, minutes: RESET_MINUTES });
-      } catch (err) {
-        console.error("[mail]", err);
-        await db.collection("resets").deleteOne({ _id: insertedId }); // 못 보낸 인증번호는 무효
-        throw new HttpError(502, `${describeMailError(err)} 잠시 후 다시 시도하세요.`);
-      }
-      return { expiresAt: expiresAt.toISOString(), delivery: "email", demoCode: null };
-    }
-
-    // 메일 설정(SMTP_USER/SMTP_PASS)이 없으면 시연 모드: 인증번호를 화면에 표시
-    // 운영에서 이 동작을 막으려면 SHOW_RESET_CODE=false
-    if (process.env.SHOW_RESET_CODE === "false") {
+    try {
+      await sendResetCodeMail({ to: email, name: user.name, code, minutes: RESET_MINUTES });
+    } catch (err) {
+      console.error("[mail]", { code: err.code, responseCode: err.responseCode });
       await db.collection("resets").deleteOne({ _id: insertedId });
-      throw new HttpError(503, "메일 발송이 설정되지 않아 인증번호를 보낼 수 없습니다. 관리자에게 문의하세요.");
+      throw new HttpError(502, `${describeMailError(err)} 잠시 후 다시 시도하세요.`);
     }
-    return { expiresAt: expiresAt.toISOString(), delivery: "demo", demoCode: code };
+    await db.collection("resets").updateOne({ _id: insertedId }, { $set: { delivery: "email" } });
+    return { expiresAt: expiresAt.toISOString(), retryAt: new Date(Date.now() + RESEND_SECONDS * 1000).toISOString() };
   },
 
   async "reset-verify"(req, db) {
     const b = body(req);
     const email = normEmail(b.email);
-    const reset = await db.collection("resets").findOne({ email, expiresAt: { $gt: new Date() } });
+    const reset = await db.collection("resets").findOne({ email, delivery: "email", expiresAt: { $gt: new Date() } });
     if (!reset) throw new HttpError(400, "인증번호가 만료되었거나 요청 기록이 없습니다. 다시 받아주세요.");
     if (reset.tries >= RESET_MAX_TRIES) throw new HttpError(429, "인증 시도 횟수를 넘었습니다. 인증번호를 다시 받아주세요.");
 
@@ -162,6 +157,7 @@ const actions = {
     checkNewPassword(b.newPassword);
     const reset = await db.collection("resets").findOne({
       email,
+      delivery: "email",
       verified: true,
       resetToken: str(b.resetToken),
       expiresAt: { $gt: new Date() },

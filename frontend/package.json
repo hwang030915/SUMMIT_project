@@ -3,6 +3,9 @@
   "private": true,
   "description": "SUMMIT - 놓치기 쉬운 결산, 빠짐없이 SUMMIT",
   "type": "module",
+  "scripts": {
+    "test": "node --experimental-vm-modules --test tests/*.test.js"
+  },
   "engines": {
     "node": "22.x"
   },
