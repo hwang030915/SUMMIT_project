@@ -371,12 +371,14 @@
 
   /** 봇이 잠깐 입력하는 것처럼 보여준 뒤 메시지 추가 */
   async function botSay(...list) {
+    let last;
     for (const m of list) {
       const done = showTyping();
       await wait(400);
       done();
-      push(m);
+      last = push(m);
     }
+    return last;
   }
 
   const userSay = (text) => push({ from: "user", text });
@@ -514,12 +516,17 @@
     await botSay({ kind: "question", qid: "remind", question: "독촉 메시지를 만들어 드릴까요? 부서를 골라 주세요.", options: depts.map((d) => ({ value: d, label: d })) });
   }
 
-  async function askRemindDept() {
+  async function askRemindDept(qid = "remind") {
     const data = await withData(monthData);
     if (!data) return;
     const depts = groupByDept(pending(data.list)).map((g) => g.dept);
     if (!depts.length) return botSay({ text: "미제출 부서가 없어서 독촉 메시지가 필요 없어요! 🎉" });
-    await botSay({ kind: "question", qid: "remind", question: "어느 부서에 보낼 메시지를 만들까요?", options: depts.map((d) => ({ value: d, label: d })) });
+    await botSay({
+      kind: "question",
+      qid,
+      question: qid === "remindSend" ? "어느 부서에 독촉 메일을 보낼까요?" : "어느 부서에 보낼 메시지를 만들까요?",
+      options: depts.map((d) => ({ value: d, label: d })),
+    });
   }
 
   async function makeReminder(dept) {
@@ -541,7 +548,7 @@
     const mailto = `mailto:${members.map((u) => u.email).join(",")}?subject=${encodeURIComponent(
       `[SUMMIT] ${data.label} 결산 자료 제출 요청 (${dept})`
     )}&body=${encodeURIComponent(message)}`;
-    await botSay({
+    return botSay({
       text: members.length
         ? `**${dept}**에 보낼 독촉 메시지예요.\n**[메일 바로 보내기]**를 누르면 ${dept} 담당자 ${members.length}명(${members
             .map((u) => u.name)
@@ -555,7 +562,8 @@
 
   /** [메일 바로 보내기]: 서버가 부서 담당자에게 실제 메일 발송 */
   async function sendReminder(m, btn) {
-    if (!m.remind || m.remindSent || busy) return;
+    if (!m.remind || m.remindSent || m.remindSending) return;
+    m.remindSending = true;
     const { department, month, to } = m.remind;
     const ok = await UI.confirm({
       icon: "send",
@@ -563,10 +571,13 @@
       message: `${to.join(", ")}님에게 미제출 자료 목록이 담긴 메일이 발송돼요.`,
       okText: "보내기",
     });
-    if (!ok) return;
+    if (!ok) {
+      m.remindSending = false;
+      return;
+    }
 
     busy = true;
-    UI.setButtonLoading(btn, true, "보내는 중...");
+    if (btn) UI.setButtonLoading(btn, true, "보내는 중...");
     try {
       const result = await Api.request("requests?action=remind", { method: "POST", body: { department, month } });
       update(m, { remindSent: true });
@@ -579,9 +590,10 @@
         aiText: `${department}에 독촉 메일 발송 완료 (${names})`,
       });
     } catch (err) {
-      UI.setButtonLoading(btn, false);
+      if (btn) UI.setButtonLoading(btn, false);
       await botSay({ text: `메일을 보내지 못했어요. ${err.message}\n\n급하면 **[메시지 복사]**나 **[내 메일 앱으로 보내기]**를 이용해 주세요.` });
     } finally {
+      m.remindSending = false;
       busy = false;
     }
   }
@@ -809,6 +821,11 @@
       update(m, { selected: [value], answered: true });
       if (m.qid === "deptStatus") await answerDeptStatus(value, m.month);
       else if (m.qid === "remind") await makeReminder(value);
+      else if (m.qid === "remindSend") {
+        const draft = await makeReminder(value);
+        const btn = draft && listEl.querySelector(`[data-id="${draft.id}"] [data-send-remind]`);
+        if (draft?.remind) await sendReminder(draft, btn);
+      }
       else if (m.qid === "contactDept") await answerContactDept(value);
     } finally {
       busy = false;
@@ -822,6 +839,15 @@
     { re: /담당자|문의|연락|누구|이메일|메일/, key: "contact" },
     { re: /현황|진행률|제출|몇\s*건|부서/, key: "status" },
   ];
+
+  /** "구매팀에 독촉 메일 보내줘"처럼 실제 발송 의도가 분명한 요청만 잡습니다. */
+  function reminderSendCommand(text) {
+    const wantsReminder = /독촉|재촉|미제출/.test(text);
+    const wantsMail = /메일|이메일/.test(text);
+    const wantsSend = /보내|발송|전송/.test(text);
+    if (!wantsReminder || !wantsMail || !wantsSend) return null;
+    return { department: DEPARTMENTS.find((department) => text.includes(department)) || "" };
+  }
 
   async function fallbackAnswer(text) {
     const hit = KEYWORDS.find((k) => k.re.test(text));
@@ -842,6 +868,22 @@
     closeSettings();
     setTab("chat");
     userSay(text);
+
+    // 외부 발송은 AI 답변에 맡기지 않고 실제 SMTP API로 연결합니다.
+    // 부서와 수신자를 보여주는 확인창에서 사용자가 최종 확인한 뒤에만 발송합니다.
+    const sendCommand = reminderSendCommand(text);
+    if (sendCommand) {
+      busy = true;
+      try {
+        if (!sendCommand.department) return await askRemindDept("remindSend");
+        const draft = await makeReminder(sendCommand.department);
+        const btn = draft && listEl.querySelector(`[data-id="${draft.id}"] [data-send-remind]`);
+        if (draft?.remind) await sendReminder(draft, btn);
+      } finally {
+        busy = false;
+      }
+      return;
+    }
 
     if (aiAvailable === false) return fallbackAnswer(text);
 

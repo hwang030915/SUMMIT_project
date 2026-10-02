@@ -128,7 +128,7 @@ test("five incorrect attempts block even the correct code", async () => {
   assert.equal((await f.call("reset-verify", { code: f.mails[0].code })).status, 429);
 });
 
-test("SMTP adapter sends HTML/text to the recipient with TLS and rejects non-acceptance", async () => {
+test("SMTP adapter sends reset and reminder mail with TLS and rejects non-acceptance", async () => {
   let options, message;
   let accepted = true;
   const mail = await load("../api/_lib/mail.js", {
@@ -145,6 +145,23 @@ test("SMTP adapter sends HTML/text to the recipient with TLS and rejects non-acc
   assert.equal(message.to, "recipient@example.test");
   assert.ok(message.text.includes("123456"));
   assert.ok(message.html.includes("테스터"));
+
+  await mail.sendReminderMail({
+    to: "department@example.test",
+    name: "이구매",
+    heading: "결산 자료 제출 요청",
+    intro: "9월 결산 자료를 확인해 주세요.",
+    note: "오늘 중 확인 부탁드립니다.",
+    replyTo: "finance@example.test",
+    subject: "[SUMMIT] 구매팀 독촉",
+    link: "https://summit.example.test/submit.html",
+    items: [{ title: "미지급 내역", department: "구매팀", month: "2026-09", deadline: "2026-09-30", dday: -2 }],
+  });
+  assert.equal(message.to, "department@example.test");
+  assert.equal(message.replyTo, "finance@example.test");
+  assert.equal(message.subject, "[SUMMIT] 구매팀 독촉");
+  assert.ok(message.text.includes("미지급 내역"));
+  assert.ok(message.html.includes("오늘 중 확인 부탁드립니다."));
   accepted = false;
   await assert.rejects(mail.sendResetCodeMail({ to: "recipient@example.test", name: "테스터", code: "123456", minutes: 3 }), { code: "EENVELOPE" });
 });
