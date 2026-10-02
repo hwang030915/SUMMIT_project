@@ -59,7 +59,7 @@ const RequestForm = (() => {
           <label class="field-label" for="${uid}-deadline">제출 기한<span class="required">*</span></label>
           <div class="input-wrap">
             <span class="input-icon">${Icons.get("calendar")}</span>
-            <input class="input date-input" type="date" id="${uid}-deadline" name="deadline" />
+            <input class="input date-input" type="date" id="${uid}-deadline" name="deadline" max="9999-12-31" />
           </div>
           <p class="field-hint">자료 제출이 필요한 기한을 선택해주세요.</p>
           <p class="field-error"></p>
