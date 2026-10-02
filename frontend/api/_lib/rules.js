@@ -35,6 +35,9 @@ export function addDays(str, n) {
   return toDateStr(d);
 }
 
+/** b - a (일) */
+export const diffDays = (a, b) => Math.round((parseDate(b) - parseDate(a)) / 86400000);
+
 export function addMonths(month, n) {
   const [y, m] = month.split("-").map(Number);
   const d = new Date(Date.UTC(y, m - 1 + n, 1));

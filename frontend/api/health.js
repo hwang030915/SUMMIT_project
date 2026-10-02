@@ -5,6 +5,7 @@
 import { getDb, readUri, diagnose } from "./_lib/db.js";
 import { send } from "./_lib/http.js";
 import { mailConfig } from "./_lib/mail.js";
+import { pushConfig } from "./_lib/push.js";
 
 export default async function handler(req, res) {
   const uri = readUri();
@@ -16,6 +17,8 @@ export default async function handler(req, res) {
     Vercel_환경: process.env.VERCEL_ENV || "local",
     메일_발송_설정됨: mailConfig().enabled,
     AI_답변_설정됨: Boolean(process.env.ANTHROPIC_API_KEY),
+    기한_알림_설정됨: Boolean((process.env.CRON_SECRET || "").trim()),
+    푸시_알림_설정됨: pushConfig().enabled,
     메일_서버: mailConfig().enabled ? `${mailConfig().host}:${mailConfig().port}` : "-",
   };
 

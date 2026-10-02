@@ -56,6 +56,7 @@ const Layout = (() => {
       <div class="page-header-right">
         <span class="today">${Icons.get("calendar")}<span>${Utils.formatKoreanDate(Utils.todayKST())}</span></span>
         <button type="button" class="theme-toggle" data-theme-toggle></button>
+        <button type="button" class="theme-toggle push-toggle" id="pushToggle"></button>
         <button type="button" class="user-chip" id="headerUser" title="내 정보">
           <span class="avatar">${Icons.get("userFill")}</span><span data-user-name></span>
         </button>
@@ -66,6 +67,7 @@ const Layout = (() => {
     renderUser();
     bindMenu();
     document.getElementById("headerUser").addEventListener("click", openProfile);
+    Push.bind(document.getElementById("pushToggle"));
     return user;
   }
 

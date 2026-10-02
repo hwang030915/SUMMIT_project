@@ -184,6 +184,15 @@ body,
   height: 20px;
 }
 
+.push-toggle.is-on {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.push-toggle.is-blocked {
+  color: var(--text-subtle);
+}
+
 .theme-toggle-floating {
   position: fixed;
   top: 18px;

@@ -55,6 +55,87 @@ export function describeMailError(err) {
   return "메일을 보내지 못했습니다.";
 }
 
+const escapeHtml = (v) =>
+  String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+/** D-day 표시: 기한이 지나면 'D+n' */
+const ddayLabel = (n) => (n > 0 ? `D-${n}` : n === 0 ? "D-day" : `D+${-n}`);
+
+/**
+ * 제출 기한 알림 메일
+ * @param {{ to: string, name: string, heading: string, intro: string,
+ *           items: { title: string, department: string, month: string, deadline: string, dday: number }[],
+ *           link: string }} p
+ */
+export async function sendReminderMail({ to, name, heading, intro, items, link }) {
+  const cfg = mailConfig();
+  const lateCount = items.filter((it) => it.dday < 0).length;
+  const subject = lateCount
+    ? `[SUMMIT] 기한이 지난 결산 자료 ${lateCount}건 포함 · 미제출 ${items.length}건`
+    : `[SUMMIT] 제출 기한이 다가온 결산 자료 ${items.length}건`;
+
+  const rows = items
+    .map((it) => {
+      const late = it.dday < 0;
+      const badge = `<span style="display:inline-block;min-width:52px;padding:3px 8px;border-radius:999px;font-size:12px;font-weight:700;text-align:center;background:${
+        late ? "#fde8e8" : "#fff1ea"
+      };color:${late ? "#d92d20" : "#e04d21"};">${ddayLabel(it.dday)}</span>`;
+      return `
+        <tr>
+          <td style="padding:12px 0;border-bottom:1px solid #eef0f3;">
+            <div style="font-size:15px;font-weight:700;color:#111827;">${escapeHtml(it.title)}</div>
+            <div style="margin-top:2px;font-size:12px;color:#6b7280;">${escapeHtml(it.department)} · ${escapeHtml(it.month)} 결산 · 기한 ${escapeHtml(it.deadline)}</div>
+          </td>
+          <td align="right" style="padding:12px 0 12px 12px;border-bottom:1px solid #eef0f3;white-space:nowrap;">${badge}</td>
+        </tr>`;
+    })
+    .join("");
+
+  await transport(cfg).sendMail({
+    from: cfg.from,
+    to,
+    subject,
+    text: [
+      `${name}님, 안녕하세요.`,
+      "",
+      intro,
+      "",
+      ...items.map((it) => `- [${ddayLabel(it.dday)}] ${it.title} (${it.department}, ${it.month} 결산, 기한 ${it.deadline})`),
+      "",
+      `SUMMIT에서 확인하기: ${link}`,
+      "",
+      "놓치기 쉬운 결산, 빠짐없이 SUMMIT",
+    ].join("\n"),
+    html: `
+<!doctype html>
+<html lang="ko"><body style="margin:0;padding:32px 16px;background:#fbe3d7;font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+    <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;">
+      <tr><td style="padding:28px 32px 8px;">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td style="width:40px;height:40px;border-radius:10px;background:#ff6a3d;color:#fff;font-size:22px;font-weight:800;text-align:center;line-height:40px;">✓</td>
+          <td style="padding-left:12px;">
+            <div style="font-size:22px;font-weight:800;color:#111827;">SUMMIT</div>
+            <div style="font-size:12px;color:#6b7280;">놓치기 쉬운 결산, 빠짐없이 <b style="color:#ff6a3d;">SUMMIT</b></div>
+          </td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:20px 32px 0;">
+        <h1 style="margin:0 0 8px;font-size:20px;color:#111827;">${escapeHtml(heading)}</h1>
+        <p style="margin:0;font-size:15px;line-height:1.6;color:#374151;">${escapeHtml(name)}님, ${escapeHtml(intro)}</p>
+      </td></tr>
+      <tr><td style="padding:12px 32px 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+      </td></tr>
+      <tr><td align="center" style="padding:24px 32px 28px;">
+        <a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 28px;border-radius:10px;background:#ff6a3d;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">SUMMIT에서 확인하기</a>
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body></html>`,
+  });
+}
+
 export async function sendResetCodeMail({ to, name, code, minutes }) {
   const cfg = mailConfig();
   if (!cfg.enabled) throw Object.assign(new Error("SMTP is not configured"), { code: "EAUTH" });

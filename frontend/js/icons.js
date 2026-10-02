@@ -29,6 +29,9 @@ const Icons = (() => {
     fileFill:
       '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H7a2.5 2.5 0 0 0-2.5 2.5v15A2.5 2.5 0 0 0 7 22h10a2.5 2.5 0 0 0 2.5-2.5V7.5z" fill="currentColor"/><path d="M14 2v4a1.5 1.5 0 0 0 1.5 1.5h4z" fill="#fff" opacity=".45"/><path d="M8.5 12.5h7M8.5 16.5h7" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>',
     alarm: stroke('<circle cx="12" cy="13" r="7.5"/><path d="M12 9.5V13l2.5 1.8M3.5 5l3-2.5M20.5 5l-3-2.5"/>', 2.2),
+    bell: stroke('<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2H4.5z"/><path d="M10 21h4"/>', 1.8),
+    bellFill: fill('<path d="M12 3a7 7 0 0 0-7 7v5.6l-1.7 2.2A.75.75 0 0 0 3.9 19h16.2a.75.75 0 0 0 .6-1.2L19 15.6V10a7 7 0 0 0-7-7z"/><path d="M9.5 20.5h5a2.5 2.5 0 0 1-5 0z"/>'),
+    bellOff: stroke('<path d="M6 16.5V11a6 6 0 0 1 9.5-4.9M18 11v5.5l1.5 2H8M10 21h4M4 4l16 16"/>', 1.8),
     mail: stroke('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/>', 1.8),
     lock: stroke('<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5M12 14.5v2.5"/>', 1.8),
     eye: stroke(EYE, 1.8),
